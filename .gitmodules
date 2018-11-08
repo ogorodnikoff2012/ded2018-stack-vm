@@ -1,0 +1,3 @@
+[submodule "oosf"]
+	path = oosf
+	url = https://github.com/ogorodnikoff2012/oosf.git
