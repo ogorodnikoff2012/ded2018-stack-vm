@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
         std::ifstream in(in_path);
 
         auto out_path = in_path;
-        ReplaceExtension(&out_path, "obj");
+        ReplaceExtension(&out_path, "vobj");
         std::ofstream out(out_path, std::ios_base::binary);
 
         if (!in.good()) {

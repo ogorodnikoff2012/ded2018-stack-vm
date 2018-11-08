@@ -7,6 +7,7 @@
 
 #include <assembler.h>
 #include <argument_descriptors.h>
+#include <oosf/output_data_stream.h>
 #include <object.h>
 
 struct Command {
@@ -126,22 +127,20 @@ static inline bool ParseDouble(double* value, const std::string_view& token) {
     return result_end == token.data() + token.length();
 }
 
-#define PERROR(reason) PrintError(line_counter, tokenizer.GetOffset(), std::max(tokenizer.GetLength(), 1UL), line, reason); return;
-
-const char* ParseFunction(Tokenizer* tok, std::unordered_map<std::string, int64_t>* defined_labels, std::vector<int8_t>* bytecode) {
+const char* ParseFunction(Tokenizer* tok, Object* object) {
     tok->NextToken();
     if (tok->IsEnd()) {
         return "Expected function name, got EOL";
     }
 
     std::string func_name(tok->Token());
-    if (defined_labels->find(func_name) != defined_labels->end()) {
+    if (object->defined_labels.find(func_name) != object->defined_labels.end()) {
         return "This name has already been used";
     }
     if (!ValidName(func_name)) {
         return "Bad function name";
     }
-    (*defined_labels)[func_name] = bytecode->size();
+    object->defined_labels[func_name] = object->bytecode.size();
 
     tok->NextToken();
     if (!tok->IsEnd()) {
@@ -151,47 +150,123 @@ const char* ParseFunction(Tokenizer* tok, std::unordered_map<std::string, int64_
     return nullptr;
 }
 
-const char* ParseVariable() {
-            tokenizer.NextToken();
-            if (tokenizer.IsEnd()) {
-                PERROR("Expected variable name, got EOL");
-            }
+const char* ParseVariable(Tokenizer* tok, Object* object) {
+    tok->NextToken();
+    if (tok->IsEnd()) {
+        return "Expected variable name, got EOL";
+    }
 
-            std::string var_name(tokenizer.Token());
-            if (defined_labels.find(var_name) != defined_labels.end()) {
-                PERROR("This name has already been used");
-            }
-            if (!ValidName(var_name)) {
-                PERROR("Bad variable name");
-            }
-            defined_labels[var_name] = bss_size;
+    std::string var_name(tok->Token());
+    if (object->defined_labels.find(var_name) != object->defined_labels.end()) {
+        return "This name has already been used";
+    }
+    if (!ValidName(var_name)) {
+        return "Bad variable name";
+    }
+    object->defined_labels[var_name] = object->bss_size;
 
-            long var_size = 1;
-            tokenizer.NextToken();
-            if (!tokenizer.IsEnd()) {
-                auto token = tokenizer.Token();
-                if (!ParseLong(&var_size, token) || var_size <= 0) {
-                    PERROR("Expected a positive integer");
-                }
-            }
+    long var_size = 1;
+    tok->NextToken();
+    if (!tok->IsEnd()) {
+        auto token = tok->Token();
+        if (!ParseLong(&var_size, token) || var_size <= 0) {
+            return "Expected a positive integer";
+        }
+    }
 
-            bss_size += var_size;
+    object->bss_size += var_size;
 
-            tokenizer.NextToken();
-            if (!tokenizer.IsEnd()) {
-                PERROR("Unexpected token");
-            }
+    tok->NextToken();
+    if (!tok->IsEnd()) {
+        return "Unexpected token";
+    }
 
+    return nullptr;
 }
 
-void Assemble(std::ifstream* in, std::ofstream*) {
+const char* ParseArgument(Tokenizer* tok, Object* object, int8_t* arg_descr, int8_t index) {
+    tok->NextToken();
+    if (tok->IsEnd()) {
+        return "Not enough arguments";
+    }
+    auto token = tok->Token();
+    int8_t arg_type = ARG_VALUE;
+    int prefix_length = 0;
+
+    switch (token[0]) {
+        case '*':
+            arg_type = ARG_POINTER;
+            prefix_length = 1;
+            break;
+        case '%':
+            arg_type = ARG_REGISTER;
+            prefix_length = 1;
+            break;
+        case '!':
+            arg_type = ARG_REGISTER_POINTER;
+            prefix_length = 1;
+            break;
+        default:
+            break;
+    }
+
+    SetArgType(arg_descr, index, arg_type);
+    token.remove_prefix(prefix_length);
+    if (arg_type == ARG_VALUE || arg_type == ARG_POINTER) {
+        object->bytecode.resize(object->bytecode.size() + sizeof(int64_t));
+        void* buffer = static_cast<void*>((object->bytecode.end() - sizeof(int64_t)).base());
+        if (long value = 0; ParseLong(&value, token)) {
+            *static_cast<int64_t*>(buffer) = value;
+        } else if (double value = 0; arg_type == ARG_VALUE && ParseDouble(&value, token)) {
+            *static_cast<double*>(buffer) = value;
+        } else if (ValidName(token)) {
+            object->required_labels[std::string(token)] = object->bytecode.size() - sizeof(int64_t);
+        } else {
+            return "Invalid label name";
+        }
+    } else {
+        long value = 0;
+        if (ParseLong(&value, token) && value >= 0 && value < (1 << 6)) {
+            object->bytecode.push_back(value);
+        } else {
+            return "Invalid register";
+        }
+    }
+
+    return nullptr;
+}
+
+const char* ParseCommand(Tokenizer* tok, Object* object) {
+    Command command = ::command_table[tok->Token()];
+    object->bytecode.push_back(command.opcode);
+
+    if (command.args_count > 0) {
+        object->bytecode.push_back(0);
+    }
+    int8_t& arguments_descriptor = object->bytecode.back();
+
+    for (int8_t i = 0; i < command.args_count; ++i) {
+        const char* error = ParseArgument(tok, object, &arguments_descriptor, i);
+        if (error != nullptr) {
+            return error;
+        }
+    }
+
+    tok->NextToken();
+    if (!tok->IsEnd()) {
+        return "Too much arguments";
+    }
+
+    return nullptr;
+}
+
+void Assemble(std::ifstream* in, std::ofstream* out) {
+#define PERROR(reason) PrintError(line_counter, tokenizer.GetOffset(), std::max(tokenizer.GetLength(), 1UL), line, reason); return;
+
     std::string line;
     int line_counter = 0;
 
-    std::vector<int8_t> bytecode;
-    std::unordered_map<std::string, int64_t> defined_labels;
-    std::unordered_map<std::string, int64_t> required_labels;
-    int64_t bss_size = 0;
+    Object object;
 
     while (std::getline(*in, line)) {
         ++line_counter;
@@ -203,80 +278,24 @@ void Assemble(std::ifstream* in, std::ofstream*) {
         }
 
         auto cmd = tokenizer.Token();
-
+        const char* error = nullptr;
         if (cmd == "FUNC") {
-            const char* error = ParseFunction(&tokenizer, &defined_labels, &bytecode);
-            if (error != nullptr) {
-                PERROR(error);
-            }
+            error = ParseFunction(&tokenizer, &object);
         } else if (cmd == "VAR") {
+            error = ParseVariable(&tokenizer, &object);
         } else if (::command_table.Contains(cmd)) {
-            Command command = ::command_table[cmd];
-            bytecode.push_back(command.opcode);
-
-            if (command.args_count > 0) {
-                bytecode.push_back(0);
-            }
-            int8_t& arguments_descriptor = bytecode.back();
-
-            for (int8_t i = 0; i < command.args_count; ++i) {
-                tokenizer.NextToken();
-                if (tokenizer.IsEnd()) {
-                    PERROR("Not enough arguments");
-                }
-                auto token = tokenizer.Token();
-                int8_t arg_type = ARG_VALUE;
-                int prefix_length = 0;
-
-                switch (token[0]) {
-                    case '*':
-                        arg_type = ARG_POINTER;
-                        prefix_length = 1;
-                        break;
-                    case '%':
-                        arg_type = ARG_REGISTER;
-                        prefix_length = 1;
-                        break;
-                    case '!':
-                        arg_type = ARG_REGISTER_POINTER;
-                        prefix_length = 1;
-                        break;
-                    default:
-                        break;
-                }
-
-                SetArgType(&arguments_descriptor, i, arg_type);
-                token.remove_prefix(prefix_length);
-                if (arg_type == ARG_VALUE || arg_type == ARG_POINTER) {
-                    bytecode.resize(bytecode.size() + sizeof(int64_t));
-                    void* buffer = static_cast<void*>((bytecode.end() - sizeof(int64_t)).base());
-                    if (long value = 0; ParseLong(&value, token)) {
-                        *static_cast<int64_t*>(buffer) = value;
-                    } else if (double value = 0; arg_type == ARG_VALUE && ParseDouble(&value, token)) {
-                        *static_cast<double*>(buffer) = value;
-                    } else if (ValidName(token)) {
-                        required_labels[std::string(token)] = bytecode.size() - sizeof(int64_t);
-                    } else {
-                        PERROR("Invalid label name");
-                    }
-                } else {
-                    long value = 0;
-                    if (ParseLong(&value, token) && value >= 0 && value < (1 << 6)) {
-                        bytecode.push_back(value);
-                    } else {
-                        PERROR("Invalid register");
-                    }
-                }
-            }
-
-            tokenizer.NextToken();
-            if (!tokenizer.IsEnd()) {
-                PERROR("Too much arguments");
-            }
+            error = ParseCommand(&tokenizer, &object);
         } else {
-//            std::cerr << " # WTF ?!" << std::endl;
-            PERROR("Unknown instruction");
+            error = "Unknown instruction";
+        }
+
+        if (error != nullptr) {
+            PERROR(error);
         }
     }
+
+    OutputDataStream dstream(out, object.defined_labels.size() + object.required_labels.size() + 1);
+    dstream.RegisterClass<Object>("vobj");
+    dstream.Write(object);
 }
 
