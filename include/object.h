@@ -10,6 +10,8 @@ struct Object : public Serializable {
     std::unordered_map<std::string, int64_t> required_labels;
     int64_t bss_size = 0;
 
+    static constexpr char kTypeName[] = "vobj";
+
     virtual ReadStatus TryRead(InputDataStream*) override;
     virtual void WriteValue(OutputDataStream*) const override;
 };

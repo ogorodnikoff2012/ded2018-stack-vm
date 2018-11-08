@@ -295,7 +295,7 @@ void Assemble(std::ifstream* in, std::ofstream* out) {
     }
 
     OutputDataStream dstream(out, object.defined_labels.size() + object.required_labels.size() + 1);
-    dstream.RegisterClass<Object>("vobj");
+    dstream.RegisterClass<Object>(Object::kTypeName);
     dstream.Write(object);
 }
 
