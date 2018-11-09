@@ -1,6 +1,29 @@
-#define VERSION_MAJOR 0
-#define VERSION_MINOR 1
-#define VERSION_PATCH 0
+#ifdef PROC_VERSION_MAJOR
+#undef PROC_VERSION_MAJOR
+#endif
+
+#ifdef PROC_VERSION_MINOR
+#undef PROC_VERSION_MINOR
+#endif
+
+#ifdef PROC_VERSION_PATCH
+#undef PROC_VERSION_PATCH
+#endif
+
+#define PROC_VERSION_MAJOR 0
+#define PROC_VERSION_MINOR 2
+#define PROC_VERSION_PATCH 0
+
+#ifdef MIN_REGISTER
+#undef MIN_REGISTER
+#endif
+
+#ifdef MAX_REGISTER
+#undef MAX_REGISTER
+#endif
+
+#define MIN_REGISTER 0
+#define MAX_REGISTER 1
 
 #ifndef DEF_CMD
 #define DEF_CMD_UNDEFINED
@@ -140,6 +163,11 @@ DEF_CMD(NOP,    0x25, 0, 0, 0, {})
 
 DEF_CMD(DUMP,   0x26, 0, 0, 0, {
     PRINT_DUMP();
+})
+
+DEF_CMD(DUP,    0x27, 0, 1, 2, {
+    TO_STACK(0) = FROM_STACK(0);
+    TO_STACK(1) = FROM_STACK(0);
 })
 
 #ifdef DEF_ALIAS_UNDEFINED

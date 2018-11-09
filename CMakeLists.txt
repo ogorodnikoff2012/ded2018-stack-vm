@@ -10,7 +10,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -O0 -Wall -Wextra -g 
 #include_directories(${Boost_INCLUDE_DIR})
 
 add_executable(asm src/assembler_main.cpp src/assembler.cpp src/object.cpp)
-add_executable(objdump src/objdump_main.cpp src/object.cpp)
+add_executable(ld src/linker_main.cpp src/linker.cpp src/object.cpp)
+add_executable(objdump src/objdump_main.cpp src/object.cpp src/objdump.cpp)
 add_executable(vm src/virtual_machine_main.cpp)
 add_executable(validator src/instruction_set_validator.cpp)
 

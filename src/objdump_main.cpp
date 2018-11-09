@@ -1,20 +1,24 @@
 #include <object.h>
 #include <oosf/input_data_stream.h>
 #include <cstdio>
+#include <objdump.h>
 
 int main(int argc, char* argv[]) {
     if (argc == 1) {
-        fprintf(stderr, "Warning: no input files specified\n");
+        std::fprintf(stderr, "Warning: no input files specified\n");
     }
     for (int i = 1; i < argc; ++i) {
+        if (argc > 2) {
+            std::printf("File %s\n", argv[i]);
+        }
         std::FILE* file = std::fopen(argv[i], "rb");
         Object obj;
         InputDataStream dstream(file);
-        dstream.RegisterClass<Object>(Object::kTypeName);
+        Object::RegisterIn(&dstream);
         if (dstream.TryRead(&obj) == kStatusOk) {
-            printf("Success!\n");
+            PrintObject(obj);
         } else {
-            printf("Failure!\n");
+            std::printf("Failed to parse %s\n", argv[i]);
         }
 
         std::fclose(file);

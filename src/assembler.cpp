@@ -102,7 +102,7 @@ bool ValidName(const String& name) {
     if (name.empty()) {
         return false;
     }
-    if (!::isalpha(name[0]) && name[0] != '_' && name[0] != ',') {
+    if (!::isalpha(name[0]) && name[0] != '_' && name[0] != '.') {
         return false;
     }
 
@@ -134,13 +134,13 @@ const char* ParseFunction(Tokenizer* tok, Object* object) {
     }
 
     std::string func_name(tok->Token());
-    if (object->defined_labels.find(func_name) != object->defined_labels.end()) {
+    if (object->defined_symbols.find(func_name) != object->defined_symbols.end()) {
         return "This name has already been used";
     }
     if (!ValidName(func_name)) {
         return "Bad function name";
     }
-    object->defined_labels[func_name] = object->bytecode.size();
+    object->defined_symbols[func_name] = Symbol(object->bytecode.size(), Symbol::kSymbolFunction);
 
     tok->NextToken();
     if (!tok->IsEnd()) {
@@ -157,13 +157,13 @@ const char* ParseVariable(Tokenizer* tok, Object* object) {
     }
 
     std::string var_name(tok->Token());
-    if (object->defined_labels.find(var_name) != object->defined_labels.end()) {
+    if (object->defined_symbols.find(var_name) != object->defined_symbols.end()) {
         return "This name has already been used";
     }
     if (!ValidName(var_name)) {
         return "Bad variable name";
     }
-    object->defined_labels[var_name] = object->bss_size;
+    object->defined_symbols[var_name] = Symbol(object->bss_size, Symbol::kSymbolVariable);
 
     long var_size = 1;
     tok->NextToken();
@@ -194,15 +194,15 @@ const char* ParseArgument(Tokenizer* tok, Object* object, int8_t* arg_descr, int
     int prefix_length = 0;
 
     switch (token[0]) {
-        case '*':
+        case ASM_PREFIX_POINTER:
             arg_type = ARG_POINTER;
             prefix_length = 1;
             break;
-        case '%':
+        case ASM_PREFIX_REGISTER:
             arg_type = ARG_REGISTER;
             prefix_length = 1;
             break;
-        case '!':
+        case ASM_PREFIX_REGISTER_POINTER:
             arg_type = ARG_REGISTER_POINTER;
             prefix_length = 1;
             break;
@@ -220,13 +220,13 @@ const char* ParseArgument(Tokenizer* tok, Object* object, int8_t* arg_descr, int
         } else if (double value = 0; arg_type == ARG_VALUE && ParseDouble(&value, token)) {
             *static_cast<double*>(buffer) = value;
         } else if (ValidName(token)) {
-            object->required_labels[std::string(token)] = object->bytecode.size() - sizeof(int64_t);
+            object->required_symbols[object->bytecode.size() - sizeof(int64_t)] = token;
         } else {
             return "Invalid label name";
         }
     } else {
         long value = 0;
-        if (ParseLong(&value, token) && value >= 0 && value < (1 << 6)) {
+        if (ParseLong(&value, token) && value >= MIN_REGISTER && value <= MAX_REGISTER) {
             object->bytecode.push_back(value);
         } else {
             return "Invalid register";
@@ -267,6 +267,9 @@ void Assemble(std::ifstream* in, std::ofstream* out) {
     int line_counter = 0;
 
     Object object;
+    object.proc_version.major = PROC_VERSION_MAJOR;
+    object.proc_version.minor = PROC_VERSION_MINOR;
+    object.proc_version.patch = PROC_VERSION_PATCH;
 
     while (std::getline(*in, line)) {
         ++line_counter;
@@ -294,8 +297,8 @@ void Assemble(std::ifstream* in, std::ofstream* out) {
         }
     }
 
-    OutputDataStream dstream(out, object.defined_labels.size() + object.required_labels.size() + 1);
-    dstream.RegisterClass<Object>(Object::kTypeName);
+    OutputDataStream dstream(out, object.defined_symbols.size() + object.required_symbols.size() + 1);
+    Object::RegisterIn(&dstream);
     dstream.Write(object);
 }
 
