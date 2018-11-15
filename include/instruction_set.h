@@ -11,19 +11,14 @@
 #endif
 
 #define PROC_VERSION_MAJOR 0
-#define PROC_VERSION_MINOR 2
+#define PROC_VERSION_MINOR 3
 #define PROC_VERSION_PATCH 0
-
-#ifdef MIN_REGISTER
-#undef MIN_REGISTER
-#endif
 
 #ifdef MAX_REGISTER
 #undef MAX_REGISTER
 #endif
 
-#define MIN_REGISTER 0
-#define MAX_REGISTER 1
+#define MAX_REGISTER ((1 << 6) - 1)
 
 #ifndef DEF_CMD
 #define DEF_CMD_UNDEFINED
@@ -49,8 +44,21 @@ DEF_CMD(POP,    0x02, 1, 1, 0, {
 BINARY_OP(ADD,  0x03, +)
 BINARY_OP(SUB,  0x04, -)
 BINARY_OP(MUL,  0x05, *)
-BINARY_OP(DIV,  0x06, /)
-BINARY_OP(MOD,  0x07, %)
+// BINARY_OP(DIV,  0x06, /)
+// BINARY_OP(MOD,  0x07, %)
+DEF_CMD(DIV, 0x06, 0, 2, 1, {
+    if (FROM_STACK(1) == 0) {
+        ERROR_DIV_ZERO;
+    }
+    TO_STACK(0) = FROM_STACK(0) / FROM_STACK(1);
+})
+
+DEF_CMD(MOD, 0x07, 0, 2, 1, {
+    if (FROM_STACK(1) == 0) {
+        ERROR_DIV_ZERO;
+    }
+    TO_STACK(0) = FROM_STACK(0) % FROM_STACK(1);
+})
 
 BINARY_OP(AND,  0x08, &)
 BINARY_OP(OR,   0x09, |)
@@ -79,7 +87,7 @@ DEF_CMD(DTI,    0x12, 0, 1, 1, {
 })
 
 DEF_CMD(RDINT,  0x13, 0, 0, 1, {
-    TO_STACK(0) = READ_INT();
+    READ_INT(TO_STACK(0));
 })
 
 DEF_CMD(WRINT,  0x14, 0, 1, 0, {
@@ -87,7 +95,7 @@ DEF_CMD(WRINT,  0x14, 0, 1, 0, {
 })
 
 DEF_CMD(RDDBL,  0x15, 0, 0, 1, {
-    AS_DOUBLE(TO_STACK(0)) = READ_DOUBLE();
+    READ_DOUBLE(AS_DOUBLE(TO_STACK(0)));
 })
 
 DEF_CMD(WRDBL,  0x16, 0, 1, 0, {
@@ -100,13 +108,13 @@ DEF_CMD(HALT,   0x17, 0, 0, 0, {
 
 DEF_CMD(JMP,    0x18, 1, 0, 0, {
     int64_t addr = 0;
-    LOAD_ARG_ADDR(0, addr);
+    LOAD_ARG(0, addr);
     JUMP_TO(addr);
 })
 
 #define COND_JMP(name, opcode, operator_) DEF_CMD(name, opcode, 1, 1, 1, {  \
     int64_t addr = 0;                                                       \
-    LOAD_ARG_ADDR(0, addr);                                                 \
+    LOAD_ARG(0, addr);                                                      \
     if (FROM_STACK(0) operator_ 0) {                                        \
         JUMP_TO(addr);                                                      \
     }                                                                       \
@@ -124,6 +132,7 @@ DEF_ALIAS(JZ, JEQ)
 DEF_ALIAS(JP, JGT)
 DEF_ALIAS(JN, JLT)
 DEF_ALIAS(JNZ, JNE)
+DEF_ALIAS(JIF, JNE)
 
 #undef COND_JMP
 
@@ -167,6 +176,19 @@ DEF_CMD(DUMP,   0x26, 0, 0, 0, {
 
 DEF_CMD(DUP,    0x27, 0, 1, 2, {
     TO_STACK(0) = FROM_STACK(0);
+    TO_STACK(1) = FROM_STACK(0);
+})
+
+DEF_CMD(NEG,    0x28, 0, 1, 1, {
+    TO_STACK(0) = -FROM_STACK(0);
+})
+
+DEF_CMD(FNEG,   0x29, 0, 1, 1, {
+    AS_DOUBLE(TO_STACK(0)) = -AS_DOUBLE(FROM_STACK(0));
+})
+
+DEF_CMD(SWAP,   0x30, 0, 2, 2, {
+    TO_STACK(0) = FROM_STACK(1);
     TO_STACK(1) = FROM_STACK(0);
 })
 

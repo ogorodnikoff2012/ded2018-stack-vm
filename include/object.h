@@ -31,7 +31,13 @@ struct Object : public Serializable {
         bool CompatibleWith(const ProcVersion& target) const;
     };
 
+    enum ObjectType {
+        kObjectStaticLinkable   = 0,
+        kObjectExecutable       = 1,
+    };
+
     ProcVersion proc_version;
+    ObjectType object_type;
     std::vector<int8_t> bytecode;
     std::unordered_map<std::string, Symbol> defined_symbols;
     std::unordered_map<int64_t, std::string> required_symbols;

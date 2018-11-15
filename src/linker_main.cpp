@@ -17,12 +17,17 @@ int main(int argc, char* argv[]) {
             std::fprintf(stderr, "ERROR cannot load %s\n", argv[i]);
             return 1;
         }
+        if (objects.back().object_type != Object::kObjectStaticLinkable) {
+            std::fprintf(stderr, "ERROR file %s is not static linkable\n", argv[i]);
+            return 1;
+        }
     }
 
     Object executable;
     executable.proc_version.major = PROC_VERSION_MAJOR;
     executable.proc_version.minor = PROC_VERSION_MINOR;
     executable.proc_version.patch = PROC_VERSION_PATCH;
+    executable.object_type = Object::kObjectExecutable;
 
     std::string error;
     if (!TryLink(objects, &executable, &error)) {

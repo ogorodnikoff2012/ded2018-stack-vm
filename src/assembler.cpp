@@ -127,20 +127,29 @@ static inline bool ParseDouble(double* value, const std::string_view& token) {
     return result_end == token.data() + token.length();
 }
 
+const char* TryAddSymbol(Object* object, const std::string_view& token, Symbol symbol) {
+    std::string name(token);
+    if (object->defined_symbols.find(name) != object->defined_symbols.end()) {
+        return "This name has already been used";
+    }
+    if (!ValidName(name)) {
+        return "Bad name";
+    }
+    object->defined_symbols[name] = symbol;
+    return nullptr;
+}
+
 const char* ParseFunction(Tokenizer* tok, Object* object) {
     tok->NextToken();
     if (tok->IsEnd()) {
         return "Expected function name, got EOL";
     }
 
-    std::string func_name(tok->Token());
-    if (object->defined_symbols.find(func_name) != object->defined_symbols.end()) {
-        return "This name has already been used";
+    const char* result = TryAddSymbol(object, tok->Token(), Symbol(object->bytecode.size(), Symbol::kSymbolFunction));
+
+    if (result != nullptr) {
+        return result;
     }
-    if (!ValidName(func_name)) {
-        return "Bad function name";
-    }
-    object->defined_symbols[func_name] = Symbol(object->bytecode.size(), Symbol::kSymbolFunction);
 
     tok->NextToken();
     if (!tok->IsEnd()) {
@@ -156,14 +165,11 @@ const char* ParseVariable(Tokenizer* tok, Object* object) {
         return "Expected variable name, got EOL";
     }
 
-    std::string var_name(tok->Token());
-    if (object->defined_symbols.find(var_name) != object->defined_symbols.end()) {
-        return "This name has already been used";
+    const char* result = TryAddSymbol(object, tok->Token(), Symbol(object->bss_size, Symbol::kSymbolVariable));
+
+    if (result != nullptr) {
+        return result;
     }
-    if (!ValidName(var_name)) {
-        return "Bad variable name";
-    }
-    object->defined_symbols[var_name] = Symbol(object->bss_size, Symbol::kSymbolVariable);
 
     long var_size = 1;
     tok->NextToken();
@@ -175,6 +181,40 @@ const char* ParseVariable(Tokenizer* tok, Object* object) {
     }
 
     object->bss_size += var_size;
+
+    tok->NextToken();
+    if (!tok->IsEnd()) {
+        return "Unexpected token";
+    }
+
+    return nullptr;
+}
+
+const char* ParseSymbol(Tokenizer* tok, Object* object) {
+    tok->NextToken();
+    if (tok->IsEnd()) {
+        return "Expected symbol name, got EOL";
+    }
+
+    const std::string symbol_name(tok->Token());
+    const char* result = TryAddSymbol(object, tok->Token(), Symbol(0, Symbol::kSymbolUndefined));
+
+    if (result != nullptr) {
+        return result;
+    }
+
+    int64_t value = 0;
+    tok->NextToken();
+    if (tok->IsEnd()) {
+        return "Expected value, got EOL";
+    }
+
+    auto token = tok->Token();
+    if (!ParseLong(&value, token) && !ParseDouble(reinterpret_cast<double*>(&value), token)) {
+        return "Expected a number";
+    }
+
+    object->defined_symbols[symbol_name].position = value;
 
     tok->NextToken();
     if (!tok->IsEnd()) {
@@ -214,7 +254,7 @@ const char* ParseArgument(Tokenizer* tok, Object* object, int8_t* arg_descr, int
     token.remove_prefix(prefix_length);
     if (arg_type == ARG_VALUE || arg_type == ARG_POINTER) {
         object->bytecode.resize(object->bytecode.size() + sizeof(int64_t));
-        void* buffer = static_cast<void*>((object->bytecode.end() - sizeof(int64_t)).base());
+        void* buffer = static_cast<void*>(object->bytecode.data() + (object->bytecode.size() - sizeof(int64_t)));
         if (long value = 0; ParseLong(&value, token)) {
             *static_cast<int64_t*>(buffer) = value;
         } else if (double value = 0; arg_type == ARG_VALUE && ParseDouble(&value, token)) {
@@ -226,7 +266,7 @@ const char* ParseArgument(Tokenizer* tok, Object* object, int8_t* arg_descr, int
         }
     } else {
         long value = 0;
-        if (ParseLong(&value, token) && value >= MIN_REGISTER && value <= MAX_REGISTER) {
+        if (ParseLong(&value, token) && value >= 0 && value <= MAX_REGISTER) {
             object->bytecode.push_back(value);
         } else {
             return "Invalid register";
@@ -270,6 +310,7 @@ void Assemble(std::ifstream* in, std::ofstream* out) {
     object.proc_version.major = PROC_VERSION_MAJOR;
     object.proc_version.minor = PROC_VERSION_MINOR;
     object.proc_version.patch = PROC_VERSION_PATCH;
+    object.object_type = Object::kObjectStaticLinkable;
 
     while (std::getline(*in, line)) {
         ++line_counter;
@@ -286,6 +327,8 @@ void Assemble(std::ifstream* in, std::ofstream* out) {
             error = ParseFunction(&tokenizer, &object);
         } else if (cmd == "VAR") {
             error = ParseVariable(&tokenizer, &object);
+        } else if (cmd == "SYMBOL") {
+            error = ParseSymbol(&tokenizer, &object);
         } else if (::command_table.Contains(cmd)) {
             error = ParseCommand(&tokenizer, &object);
         } else {

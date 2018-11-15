@@ -29,6 +29,7 @@ void Object::WriteValue(OutputDataStream* out) const {
     out->WriteMinimal(proc_version.major);
     out->WriteMinimal(proc_version.minor);
     out->WriteMinimal(proc_version.patch);
+    out->WriteMinimal(object_type);
     out->Write(bytecode);
     out->WriteAsMap(defined_symbols.begin(), defined_symbols.end(), defined_symbols.size());
     out->WriteAsMap(required_symbols.begin(), required_symbols.end(), required_symbols.size());
@@ -37,11 +38,12 @@ void Object::WriteValue(OutputDataStream* out) const {
 
 ReadStatus Object::TryRead(InputDataStream* in) {
     ReadStatus read_status = kStatusOk;
-    int64_t major_buf = 0, minor_buf = 0, patch_buf = 0;
+    int64_t major_buf = 0, minor_buf = 0, patch_buf = 0, object_type_buf = 0;
     if (
         ((read_status = in->TryReadMinimal(&major_buf)) == kStatusOk) &&
         ((read_status = in->TryReadMinimal(&minor_buf)) == kStatusOk) &&
         ((read_status = in->TryReadMinimal(&patch_buf)) == kStatusOk) &&
+        ((read_status = in->TryReadMinimal(&object_type_buf)) == kStatusOk) &&
         ((read_status = in->TryRead(&bytecode)) == kStatusOk) &&
         ((read_status = in->TryRead(&defined_symbols)) == kStatusOk) &&
         ((read_status = in->TryRead(&required_symbols)) == kStatusOk) &&
@@ -50,6 +52,7 @@ ReadStatus Object::TryRead(InputDataStream* in) {
         proc_version.major = major_buf;
         proc_version.minor = minor_buf;
         proc_version.patch = patch_buf;
+        object_type = static_cast<ObjectType>(object_type_buf);
     }
     return read_status;
 }

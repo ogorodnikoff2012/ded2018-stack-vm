@@ -19,6 +19,21 @@ void PrintProcInfo(const Object& obj) {
     std::printf("Processor version: %d.%d.%d\n", obj.proc_version.major, obj.proc_version.minor, obj.proc_version.patch);
 }
 
+static inline const char* GetObjectType(Object::ObjectType type) {
+    switch (type) {
+        case Object::kObjectExecutable:
+            return "Executable";
+        case Object::kObjectStaticLinkable:
+            return "Static Linkable";
+        default:
+            return "???";
+    }
+}
+
+void PrintObjectType(const Object& obj) {
+    std::printf("Object file type: %s\n", GetObjectType(obj.object_type));
+}
+
 void PrintSymbols(const Object& obj) {
     std::printf("Symbols:\n");
     for (const auto&[name, symbol] : obj.defined_symbols) {
@@ -96,6 +111,7 @@ void PrintListing(const Object& obj) {
 
 void PrintObject(const Object& obj) {
     PrintProcInfo(obj);
+    PrintObjectType(obj);
     PrintSymbols(obj);
     PrintListing(obj);
 }
