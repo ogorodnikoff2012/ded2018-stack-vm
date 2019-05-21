@@ -5,10 +5,10 @@
 #include <vector>
 #include <cstdlib>
 
-#include <assembler.h>
-#include <argument_descriptors.h>
-#include <oosf/output_data_stream.h>
-#include <object.h>
+#include "assembler.h"
+#include "argument_descriptors.h"
+#include "oosf/output_data_stream.h"
+#include "object.h"
 
 struct Command {
     int8_t opcode;
@@ -22,7 +22,7 @@ public:
     CommandTable() : command_table_() {
 #define DEF_CMD(name, opcode, argcnt, ...) command_table_[( #name )] = {( opcode ), ( argcnt )};
 #define DEF_ALIAS(name, canonical) command_table_[( #name )] = command_table_[( #canonical )];
-#include <instruction_set.h>
+#include "instruction_set.h"
 #undef DEF_CMD
 #undef DEF_ALIAS
     }
@@ -254,6 +254,7 @@ const char* ParseArgument(Tokenizer* tok, Object* object, int8_t* arg_descr, int
     token.remove_prefix(prefix_length);
     if (arg_type == ARG_VALUE || arg_type == ARG_POINTER) {
         object->bytecode.resize(object->bytecode.size() + sizeof(int64_t));
+
         void* buffer = static_cast<void*>(object->bytecode.data() + (object->bytecode.size() - sizeof(int64_t)));
         if (long value = 0; ParseLong(&value, token)) {
             *static_cast<int64_t*>(buffer) = value;

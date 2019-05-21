@@ -11,7 +11,7 @@
 #endif
 
 #define PROC_VERSION_MAJOR 0
-#define PROC_VERSION_MINOR 3
+#define PROC_VERSION_MINOR 4
 #define PROC_VERSION_PATCH 0
 
 #ifdef MAX_REGISTER
@@ -65,6 +65,13 @@ BINARY_OP(OR,   0x09, |)
 BINARY_OP(XOR,  0x0A, ^)
 BINARY_OP(SHL,  0x0B, <<)
 BINARY_OP(SHR,  0x0C, >>)
+
+BINARY_OP(CLT,  0x33, <)
+BINARY_OP(CGT,  0x34, >)
+BINARY_OP(CLE,  0x35, <=)
+BINARY_OP(CGE,  0x36, >=)
+BINARY_OP(CEQ,  0x37, ==)
+BINARY_OP(CNE,  0x38, !=)
 
 #undef BINARY_OP
 
@@ -190,6 +197,14 @@ DEF_CMD(FNEG,   0x29, 0, 1, 1, {
 DEF_CMD(SWAP,   0x30, 0, 2, 2, {
     TO_STACK(0) = FROM_STACK(1);
     TO_STACK(1) = FROM_STACK(0);
+})
+
+DEF_CMD(BOOL,   0x31, 0, 1, 1, {
+    TO_STACK(0) = static_cast<bool>(FROM_STACK(0));
+})
+
+DEF_CMD(NOT,    0x32, 0, 1, 1, {
+    TO_STACK(0) = !(FROM_STACK(0));
 })
 
 #ifdef DEF_ALIAS_UNDEFINED

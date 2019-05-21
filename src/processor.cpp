@@ -116,10 +116,10 @@ case code: {                                                                    
         status_ = kExecStatusDataStackOverflow;                                             \
         return false;                                                                       \
     }                                                                                       \
-    int64_t* args[argcnt + 1];                                                              \
-    int64_t arg_stubs[argcnt + 1];                                                          \
-    int64_t from_stack[from_stack_cnt + 1];                                                 \
-    int64_t to_stack[to_stack_cnt + 1];                                                     \
+    int64_t* args[argcnt + 1] = {};                                                         \
+    int64_t arg_stubs[argcnt + 1] = {};                                                     \
+    int64_t from_stack[from_stack_cnt + 1] = {};                                            \
+    int64_t to_stack[to_stack_cnt + 1] = {};                                                \
     if (!FillArgs(bytecode, args, arg_stubs, ram, argcnt, &instruction_pointer_copy)) {     \
         return false;                                                                       \
     }                                                                                       \
