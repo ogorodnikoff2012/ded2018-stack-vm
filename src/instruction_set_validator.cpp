@@ -28,7 +28,7 @@ bool test_for_collisions() {
 
 bool just_write_em_all() {
     std::cerr << "Commands:\n";
-#define DEF_CMD(name, opcode, argcnt, from_stack_cnt, to_stack_cnt, handler) \
+#define DEF_CMD(name, opcode, argcnt, from_stack_cnt, to_stack_cnt, ...) \
     std::cerr << std::setw(2) << opcode << ' ' << #name << ":  \t" << argcnt << " args, " << from_stack_cnt << " pops, " << to_stack_cnt << " pushes\n";
 #include <instruction_set.h>
 #undef DEF_CMD

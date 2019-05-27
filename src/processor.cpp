@@ -106,7 +106,7 @@ call_stack_.pop_back();
 #define ERROR_DIV_ZERO { status_ = kExecStatusDivZero; return false; }
 
 
-#define DEF_CMD(name, code, argcnt, from_stack_cnt, to_stack_cnt, handler)                  \
+#define DEF_CMD(name, code, argcnt, from_stack_cnt, to_stack_cnt, handler, ...)             \
 case code: {                                                                                \
     if (data_stack_.size() < from_stack_cnt) {                                              \
         status_ = kExecStatusEmptyDataStack;                                                \
