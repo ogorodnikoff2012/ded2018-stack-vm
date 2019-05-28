@@ -52,10 +52,9 @@ DEF_CMD(POP,    0x02, 1, 1, 0, {
             ASM_MOV_RAX_REG(ARG(0));
             break;
         case ARG_REGISTER_POINTER:
-            ASM_MOV_RAX_RBX();
-            ASM_MOV_REG_RAX(ARG(0));
-            CONVERT_RAX_TO_DATA_PTR();
-            ASM_MOV_RBX_BY_RAX();
+            ASM_MOV_REG_RBX(ARG(0));
+            CONVERT_RBX_TO_DATA_PTR();
+            ASM_MOV_RAX_BY_RBX();
             break;
     }
     ASM_POP_RAX();
@@ -146,7 +145,7 @@ DEF_CMD(RDINT,  0x13, 0, 0, 1, {
 }, {
     ASM_PUSH_RAX();
     ASM_SAVE_REGS();
-    ASM_CALL(READ_INT_CALL);
+    ASM_CALL_VIA_RAX(READ_INT_CALL);
     ASM_MOV_RAX_RBX();
     ASM_RESTORE_REGS();
     ASM_MOV_RBX_RAX();
@@ -157,7 +156,7 @@ DEF_CMD(WRINT,  0x14, 0, 1, 0, {
 }, {
     ASM_MOV_RAX_RDI();
     ASM_SAVE_REGS();
-    ASM_CALL(WRITE_INT_CALL);
+    ASM_CALL_VIA_RAX(WRITE_INT_CALL);
     ASM_RESTORE_REGS();
     ASM_POP_RAX();
 })
@@ -167,7 +166,7 @@ DEF_CMD(RDDBL,  0x15, 0, 0, 1, {
 }, {
     ASM_PUSH_RAX();
     ASM_SAVE_REGS();
-    ASM_CALL(READ_DOUBLE_CALL);
+    ASM_CALL_VIA_RAX(READ_DOUBLE_CALL);
     ASM_RESTORE_REGS();
     ASM_MOV_XMM0_RAX();
 })
@@ -177,7 +176,7 @@ DEF_CMD(WRDBL,  0x16, 0, 1, 0, {
 }, {
     ASM_MOV_RAX_XMM0();
     ASM_SAVE_REGS();
-    ASM_CALL(WRITE_DOUBLE_CALL);
+    ASM_CALL_VIA_RAX(WRITE_DOUBLE_CALL);
     ASM_RESTORE_REGS();
     ASM_POP_RAX();
 })
@@ -185,9 +184,7 @@ DEF_CMD(WRDBL,  0x16, 0, 1, 0, {
 DEF_CMD(HALT,   0x17, 0, 0, 0, {
     STOP_PROCESSOR
 }, {
-    ASM_PUSH_RAX();
-    ASM_ZERO_RAX();
-    ASM_CALL(HALT_CALL);
+    ASM_CALL_VIA_RAX(HALT_CALL);
 })
 
 DEF_CMD(JMP,    0x18, 1, 0, 0, {
@@ -196,7 +193,8 @@ DEF_CMD(JMP,    0x18, 1, 0, 0, {
     JUMP_TO(addr);
 }, {
     COMPUTE_ARG(0);
-    ASM_JMP_BY_RBX();
+    CONVERT_RBX_TO_CODE_PTR();
+    ASM_JMP_RBX();
 })
 
 #define COND_JMP(name, opcode, operator_, asm_op) DEF_CMD(name, opcode, 1, 1, 1, {  \
@@ -208,16 +206,17 @@ DEF_CMD(JMP,    0x18, 1, 0, 0, {
     TO_STACK(0) = FROM_STACK(0);                                                    \
 }, {                                                                                \
     COMPUTE_ARG(0);                                                                 \
+    CONVERT_RBX_TO_CODE_PTR();                                                      \
     ASM_CMP_IMM8_RAX(0);                                                            \
     { asm_op }                                                                      \
 })
 
-COND_JMP(JEQ,   0x19, ==, { ASM_JNE_REL8(2); ASM_JMP_BY_RBX(); })
-COND_JMP(JGT,   0x1A, >, { ASM_JLE_REL8(2); ASM_JMP_BY_RBX(); })
-COND_JMP(JLT,   0x1B, <, { ASM_JGE_REL8(2); ASM_JMP_BY_RBX(); })
-COND_JMP(JNE,   0x1C, !=, { ASM_JE_REL8(2); ASM_JMP_BY_RBX(); })
-COND_JMP(JGE,   0x1D, >=, { ASM_JL_REL8(2); ASM_JMP_BY_RBX(); })
-COND_JMP(JLE,   0x1E, <=, { ASM_JG_REL8(2); ASM_JMP_BY_RBX(); })
+COND_JMP(JEQ,   0x19, ==, { ASM_JNE_REL8(2); ASM_JMP_RBX(); })
+COND_JMP(JGT,   0x1A, >, { ASM_JLE_REL8(2); ASM_JMP_RBX(); })
+COND_JMP(JLT,   0x1B, <, { ASM_JGE_REL8(2); ASM_JMP_RBX(); })
+COND_JMP(JNE,   0x1C, !=, { ASM_JE_REL8(2); ASM_JMP_RBX(); })
+COND_JMP(JGE,   0x1D, >=, { ASM_JL_REL8(2); ASM_JMP_RBX(); })
+COND_JMP(JLE,   0x1E, <=, { ASM_JG_REL8(2); ASM_JMP_RBX(); })
 
 DEF_ALIAS(JZ, JEQ)
 DEF_ALIAS(JP, JGT)
@@ -282,7 +281,9 @@ DEF_CMD(CALL,   0x23, 1, 0, 0, {
     JUMP_TO(addr);
 }, {
     COMPUTE_ARG(0);
-    ASM_CALL(FUNC_CALL);
+    CONVERT_RBX_TO_CODE_PTR();
+    ASM_MOV_RAX_RCX();
+    ASM_CALL_VIA_RAX(FUNC_CALL);
 })
 
 DEF_CMD(RET,    0x24, 0, 0, 0, {
@@ -300,7 +301,7 @@ DEF_CMD(DUMP,   0x26, 0, 0, 0, {
     PRINT_DUMP();
 }, {
     ASM_SAVE_REGS();
-    ASM_CALL(PRINT_DUMP_CALL);
+    ASM_CALL_VIA_RAX(PRINT_DUMP_CALL);
     ASM_RESTORE_REGS();
 })
 
