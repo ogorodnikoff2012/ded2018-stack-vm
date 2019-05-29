@@ -346,6 +346,8 @@ std::ostream& operator<<(std::ostream& out, const Directly<T>& d) {
 #define ASM_TEST_RAX_RAX()          APPEND_INSTRUCTION(0x48, 0x85, 0xc0)
 #define ASM_SETZ_AL()               APPEND_INSTRUCTION(0x0f, 0x94, 0xc0)
 #define ASM_SETNZ_AL()              APPEND_INSTRUCTION(0x0f, 0x95, 0xc0)
+#define ASM_MOV_RAX_RDX()           APPEND_INSTRUCTION(0x48, 0x89, 0xc2)
+#define ASM_SAR_IMM8_RDX(x)         APPEND_INSTRUCTION(0x48, 0xc1, 0xfa, x)
 
 #define ARG_TYPE(x)                 arg_types[x]
 #define ARG(x)                      arg_values[x]

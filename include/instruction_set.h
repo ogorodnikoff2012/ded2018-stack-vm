@@ -78,7 +78,8 @@ DEF_CMD(DIV, 0x06, 0, 2, 1, {
 }, {
     ASM_MOV_RAX_RBX();
     ASM_POP_RAX();
-    ASM_ZERO_RDX();
+    ASM_MOV_RAX_RDX();
+    ASM_SAR_IMM8_RDX(63);
     ASM_IDIV_RBX();
 })
 
@@ -90,7 +91,8 @@ DEF_CMD(MOD, 0x07, 0, 2, 1, {
 }, {
     ASM_MOV_RAX_RBX();
     ASM_POP_RAX();
-    ASM_ZERO_RDX();
+    ASM_MOV_RAX_RDX();
+    ASM_SAR_IMM8_RDX(63);
     ASM_IDIV_RBX();
     ASM_MOV_RDX_RAX();
 })
